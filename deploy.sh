@@ -35,7 +35,13 @@ if [[ -z "${PROJECT_ID}" ]]; then
 fi
 gcloud config set project "${PROJECT_ID}" >/dev/null 2>&1
 
-if [[ "$(gcloud billing projects describe "${PROJECT_ID}" --format='value(billingEnabled)' 2>/dev/null)" != "True" ]]; then
+# Billing check. Only stop when Google clearly says billing is off: on a new
+# project the Cloud Billing API may not be enabled, so the lookup itself can
+# fail even though billing is fine. In that case carry on; enabling the APIs
+# below fails with a clear message if billing really is missing.
+BILLING="$(CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud billing projects describe "${PROJECT_ID}" \
+  --format='value(billingEnabled)' 2>/dev/null || true)"
+if [[ "${BILLING}" == "False" ]]; then
   echo "Billing isn't linked to project ${PROJECT_ID}. Cloud Run needs it." >&2
   echo "Link a billing account here, then run this script again:" >&2
   echo "  https://console.cloud.google.com/billing/linkedaccount?project=${PROJECT_ID}" >&2
